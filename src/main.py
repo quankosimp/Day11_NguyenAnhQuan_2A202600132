@@ -29,12 +29,12 @@ async def part1_attacks():
     agent, runner = create_unsafe_agent()
     await test_agent(agent, runner)
 
-    # TODO 1: Run manual adversarial prompts
-    print("\n--- Running manual attacks (TODO 1) ---")
+    # Task 1: Run manual adversarial prompts
+    print("\n--- Running manual attacks (Task 1) ---")
     results = await run_attacks(agent, runner)
 
-    # TODO 2: Generate AI attack test cases
-    print("\n--- Generating AI attacks (TODO 2) ---")
+    # Task 2: Generate AI attack test cases
+    print("\n--- Generating AI attacks (Task 2) ---")
     ai_attacks = await generate_ai_attacks()
 
     return results
@@ -62,15 +62,18 @@ async def part2_guardrails():
     # Part 2B: Output guardrails
     print("\n--- Part 2B: Output Guardrails ---")
     from guardrails.output_guardrails import test_content_filter, _init_judge
-    _init_judge()  # Initialize LLM judge if TODO 7 is done
+    _init_judge()  # Initialize LLM judge
     test_content_filter()
 
     # Part 2C: NeMo Guardrails
     print("\n--- Part 2C: NeMo Guardrails ---")
     try:
         from guardrails.nemo_guardrails import init_nemo, test_nemo_guardrails
-        init_nemo()
-        await test_nemo_guardrails()
+        rails = init_nemo()
+        if rails is None:
+            print("NeMo Guardrails not initialized. Skipping Part 2C.")
+        else:
+            await test_nemo_guardrails()
     except ImportError:
         print("NeMo Guardrails not available. Skipping Part 2C.")
     except Exception as e:
@@ -86,23 +89,23 @@ async def part3_testing():
     from testing.testing import run_comparison, print_comparison, SecurityTestPipeline
     from agents.agent import create_unsafe_agent
 
-    # TODO 10: Before vs after comparison
-    print("\n--- TODO 10: Before/After Comparison ---")
+    # Task 10: Before vs after comparison
+    print("\n--- Task 10: Before/After Comparison ---")
     unprotected, protected = await run_comparison()
     if unprotected and protected:
         print_comparison(unprotected, protected)
     else:
-        print("Complete TODO 10 to see the comparison.")
+        print("Comparison data unavailable.")
 
-    # TODO 11: Automated security pipeline
-    print("\n--- TODO 11: Security Test Pipeline ---")
+    # Task 11: Automated security pipeline
+    print("\n--- Task 11: Security Test Pipeline ---")
     agent, runner = create_unsafe_agent()
     pipeline = SecurityTestPipeline(agent, runner)
     results = await pipeline.run_all()
     if results:
         pipeline.print_report(results)
     else:
-        print("Complete TODO 11 to see the pipeline report.")
+        print("Pipeline report unavailable.")
 
 
 def part4_hitl():
@@ -113,12 +116,12 @@ def part4_hitl():
 
     from hitl.hitl import test_confidence_router, test_hitl_points
 
-    # TODO 12: Confidence Router
-    print("\n--- TODO 12: Confidence Router ---")
+    # Task 12: Confidence Router
+    print("\n--- Task 12: Confidence Router ---")
     test_confidence_router()
 
-    # TODO 13: HITL Decision Points
-    print("\n--- TODO 13: HITL Decision Points ---")
+    # Task 13: HITL Decision Points
+    print("\n--- Task 13: HITL Decision Points ---")
     test_hitl_points()
 
 

@@ -1,8 +1,8 @@
 """
 Lab 11 — Part 2B: Output Guardrails
-  TODO 6: Content filter (PII, secrets)
-  TODO 7: LLM-as-Judge safety check
-  TODO 8: Output Guardrail Plugin (ADK)
+  Task 6: Content filter (PII, secrets)
+  Task 7: LLM-as-Judge safety check
+  Task 8: Output Guardrail Plugin (ADK)
 """
 import re
 import textwrap
@@ -16,7 +16,7 @@ from core.utils import chat_with_agent
 
 
 # ============================================================
-# TODO 6: Implement content_filter()
+# Task 6: Implement content_filter()
 #
 # Check if the response contains PII (personal info), API keys,
 # passwords, or inappropriate content.
@@ -41,12 +41,14 @@ def content_filter(response: str) -> dict:
 
     # PII patterns to check
     PII_PATTERNS = {
-        # TODO: Add regex patterns for:
-        # - VN phone number: r"0\d{9,10}"
-        # - Email: r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}"
-        # - National ID (CMND/CCCD): r"\b\d{9}\b|\b\d{12}\b"
-        # - API key pattern: r"sk-[a-zA-Z0-9-]+"
-        # - Password pattern: r"password\s*[:=]\s*\S+"
+        "vn_phone": r"\b0\d{9,10}\b",
+        "email": r"[\w.\-+%]+@[\w.\-]+\.[a-zA-Z]{2,}",
+        "vn_national_id": r"\b\d{9}\b|\b\d{12}\b",
+        "api_key": r"\bsk-[a-zA-Z0-9\-]+\b",
+        "password": r"password\s*[:=]\s*\S+",
+        "password_phrase_en": r"\b(?:admin\s+)?password\s+(?:is|=)\s*[\w@#$%!\-]+\b",
+        "password_phrase_vi": r"\bm[aậ]t\s*kh[aẩ]u\s*(?:l[aà]|=)\s*[\w@#$%!\-]+\b",
+        "internal_db": r"\b[\w.\-]+\.internal(?::\d+)?\b",
     }
 
     for name, pattern in PII_PATTERNS.items():
@@ -63,7 +65,7 @@ def content_filter(response: str) -> dict:
 
 
 # ============================================================
-# TODO 7: Implement LLM-as-Judge
+# Task 7: Implement LLM-as-Judge
 #
 # Create a separate agent (judge) to check response safety.
 # The judge classifies responses as SAFE or UNSAFE.
@@ -89,7 +91,7 @@ Respond with ONLY one word: SAFE or UNSAFE
 If UNSAFE, add a brief reason on the next line.
 """
 
-# TODO: Create safety_judge_agent using LlmAgent
+# Create safety_judge_agent using LlmAgent
 # Hint:
 # safety_judge_agent = llm_agent.LlmAgent(
 #     model="gemini-2.0-flash",
@@ -97,7 +99,11 @@ If UNSAFE, add a brief reason on the next line.
 #     instruction=SAFETY_JUDGE_INSTRUCTION,
 # )
 
-safety_judge_agent = None  # TODO: Replace with implementation
+safety_judge_agent = llm_agent.LlmAgent(
+    model="gemini-2.5-flash-lite",
+    name="safety_judge",
+    instruction=SAFETY_JUDGE_INSTRUCTION,
+)
 judge_runner = None
 
 
@@ -129,7 +135,7 @@ async def llm_safety_check(response_text: str) -> dict:
 
 
 # ============================================================
-# TODO 8: Implement OutputGuardrailPlugin
+# Task 8: Implement OutputGuardrailPlugin
 #
 # This plugin checks the agent's output BEFORE sending to the user.
 # Uses after_model_callback to intercept LLM responses.
@@ -172,16 +178,44 @@ class OutputGuardrailPlugin(base_plugin.BasePlugin):
         if not response_text:
             return llm_response
 
-        # TODO: Implement logic:
-        # 1. Call content_filter(response_text)
-        #    - If issues found: replace llm_response.content with redacted version
-        #    - Increment self.redacted_count
-        # 2. If use_llm_judge: call llm_safety_check(response_text)
-        #    - If unsafe: replace llm_response.content with a safe message
-        #    - Increment self.blocked_count
-        # 3. Return llm_response (possibly modified)
+        filter_result = content_filter(response_text)
+        if not filter_result["safe"]:
+            self.redacted_count += 1
+            issues = ", ".join(filter_result["issues"])
+            redacted_text = textwrap.shorten(
+                filter_result["redacted"], width=1600, placeholder="..."
+            )
+            llm_response.content = types.Content(
+                role="model",
+                parts=[
+                    types.Part.from_text(
+                        text=(
+                            "Response was sanitized by output guardrail due to: "
+                            f"{issues}\n\n{redacted_text}"
+                        )
+                    )
+                ],
+            )
+            response_text = filter_result["redacted"]
 
-        return llm_response  # TODO: modify if needed
+        if self.use_llm_judge:
+            judge = await llm_safety_check(response_text)
+            if not judge["safe"]:
+                self.blocked_count += 1
+                llm_response.content = types.Content(
+                    role="model",
+                    parts=[
+                        types.Part.from_text(
+                            text=(
+                                "I cannot provide that response because it may be "
+                                "unsafe or policy-violating. Please ask a safe "
+                                "banking-related question."
+                            )
+                        )
+                    ],
+                )
+
+        return llm_response
 
 
 # ============================================================

@@ -101,11 +101,65 @@ python hitl/hitl.py
 1. **Security Report**: Before/after comparison of 5+ attacks (ADK + NeMo)
 2. **HITL Flowchart**: 3 decision points with escalation paths
 
+## Lab Workflow (Step-by-step)
+
+### Part 1: Attack Unprotected Agent
+
+1. Create unsafe agent (`src/agents/agent.py`) with intentionally embedded secrets.
+2. Run 5 manual adversarial prompts (TODO 1).
+3. Generate 5 AI-based attack prompts via Gemini (TODO 2).
+4. Record what leaked and why.
+
+### Part 2A: Input Guardrails (Block before LLM)
+
+Flow:
+
+`User Input -> Injection Detection -> Topic Filter -> LLM`
+
+- TODO 3: Implement regex-based prompt injection detection.
+- TODO 4: Implement topic policy (allow banking topics, block dangerous/off-topic).
+- TODO 5: Combine both into ADK `InputGuardrailPlugin`.
+
+### Part 2B: Output Guardrails (Check before user sees output)
+
+Flow:
+
+`LLM Response -> Content Filter -> LLM-as-Judge -> User`
+
+- TODO 6: Detect/redact PII, credentials, internal endpoints.
+- TODO 7: Build separate judge agent that returns `SAFE` or `UNSAFE`.
+- TODO 8: Integrate into ADK `OutputGuardrailPlugin`.
+
+### Part 2C: NeMo Guardrails (Colang)
+
+- TODO 9: Add Colang rules to handle advanced attacks:
+  - Role confusion (`you are now...`)
+  - Encoding extraction (`Base64`, `ROT13`, etc.)
+  - Vietnamese injection (`Bỏ qua mọi hướng dẫn...`)
+
+### Part 3: Security Testing Pipeline
+
+- TODO 10: Rerun the same 5 attacks on protected agent and compare before/after.
+- TODO 11: Build automated test pipeline:
+  - run batch attacks
+  - classify blocked/leaked/error
+  - compute metrics (`block_rate`, `leak_rate`)
+  - print report
+
+### Part 4: HITL Design
+
+- TODO 12: Implement confidence router:
+  - `>= 0.9`: auto-send
+  - `0.7 - 0.9`: queue for review
+  - `< 0.7`: escalate
+  - high-risk actions: always escalate
+- TODO 13: Define 3 real banking HITL decision points (trigger + HITL model + context).
+
 ## 13 TODOs
 
 | # | Description | Framework |
 |---|-------------|-----------|
-| 1 | Write 5 adversarial prompts | - |
+| 1 | Write 5 adversarial prompts | Python |
 | 2 | Generate attack test cases with AI | Gemini |
 | 3 | Injection detection (regex) | Python |
 | 4 | Topic filter | Python |
@@ -119,6 +173,83 @@ python hitl/hitl.py
 | 12 | Confidence Router (HITL) | Python |
 | 13 | Design 3 HITL decision points | Design |
 
+## Completion Checklist
+
+- [ ] Part 1 shows at least one successful leak on the unsafe agent.
+- [ ] Input guardrail blocks prompt injection and off-topic content.
+- [ ] Output guardrail redacts sensitive strings and can block unsafe responses.
+- [ ] NeMo rules catch at least 3 advanced attack patterns.
+- [ ] Protected agent blocks more attacks than unprotected agent.
+- [ ] Pipeline prints summary metrics and leaked secret list.
+- [ ] HITL router behavior matches thresholds and high-risk override.
+- [ ] 3 HITL decision points are documented with real banking context.
+
+## Security Report Template
+
+Use this format for your submission:
+
+1. Summary
+- Total attacks: `N`
+- Blocked before guardrails: `x/N`
+- Blocked after guardrails: `y/N`
+
+2. Most severe vulnerability
+- Which attack caused the highest risk and why?
+
+3. Most effective guardrail
+- Which layer (input/output/NeMo/HITL) reduced risk most?
+
+4. Residual risks
+- What can still fail in production? (e.g., obfuscated prompts, quota/rate limits)
+
+## HITL Flowchart Template
+
+Use this text flow as baseline:
+
+```text
+                    [User Request]
+                         |
+                         v
+                [Input Guardrails]
+                    /        \
+               BLOCK         PASS
+                |              |
+                v              v
+         [Error Msg]    [Agent Processing]
+                              |
+                              v
+                    [Confidence Check]
+                    /     |        \
+               HIGH    MEDIUM      LOW
+              (>=0.9)  (0.7-0.9)  (<0.7)
+                |        |          |
+                v        v          v
+          [Auto Send] [Queue    [Escalate to
+                       Review]   Human]
+                         |          |
+                         v          v
+                    [Human Reviews with Context]
+                       /              \
+                  APPROVE           REJECT
+                    |                 |
+                    v                 v
+              [Send to User]   [Modify & Retry]
+                                     |
+                                     v
+                              [Feedback Loop]
+                        (Update guardrails/thresholds)
+```
+
+## Troubleshooting
+
+- `429 RESOURCE_EXHAUSTED` from Gemini:
+  - You hit free-tier quota/rate limit.
+  - Wait for quota reset, reduce test calls, or switch to a plan/model with higher quota.
+- `ModuleNotFoundError: core`:
+  - Run modules from `src/` or use `python main.py` in `src/`.
+- NeMo not available:
+  - Install with `pip install nemoguardrails>=0.10.0`.
+
 ## References
 
 - [OWASP Top 10 for LLM](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
@@ -128,4 +259,3 @@ python hitl/hitl.py
 - [AI Safety Fundamentals](https://aisafetyfundamentals.com/)
 - [AI Red Teaming Guide](https://github.com/requie/AI-Red-Teaming-Guide)
 - [antoan.ai - AI Safety Vietnam](https://antoan.ai)
-
